@@ -1,0 +1,29 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+venv/
+.venv/
+
+# dados brutos e processados (pesados)
+data/raw/
+data/processed/
+data/msas/
+
+# checkpoints do modelo
+checkpoints/
+*.ckpt
+*.pt
+
+# resultados de inferência
+results/
+
+# logs
+*.log
+logs/
+
+# jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
