@@ -6,7 +6,7 @@ import pandas as pd
 from tqdm import tqdm
 
 
-def make_boltz_yaml(pdb_id: str, alpha_seq: str, b2m_seq: str, peptide_seq: str) -> dict:
+def make_boltz_yaml(alpha_seq: str, b2m_seq: str, peptide_seq: str) -> dict:
     return {
         "version": 1,
         "sequences": [
@@ -24,7 +24,6 @@ def generate_yaml_inputs(sequences_csv: str, out_dir: str):
     for _, row in tqdm(df.iterrows(), total=len(df)):
         pdb_id = row["pdb_id"]
         config = make_boltz_yaml(
-            pdb_id=pdb_id,
             alpha_seq=row["alpha_seq"],
             b2m_seq=row["b2m_seq"],
             peptide_seq=row["peptide_seq"],
@@ -47,9 +46,11 @@ def split_dataset(sequences_csv: str, out_dir: str, test_size: float = 0.15, val
     train_idx, temp_idx = next(gss.split(df, groups=df["alpha_seq"]))
 
     temp_df = df.iloc[temp_idx]
-    val_fraction = val_size / (test_size + val_size)
-    gss2 = GroupShuffleSplit(n_splits=1, test_size=val_fraction, random_state=42)
-    test_idx_r, val_idx_r = next(gss2.split(temp_df, groups=temp_df["alpha_seq"]))
+    # second split: divide temp into val and test
+    # test_size here = fraction of temp that becomes the test set
+    test_fraction = test_size / (test_size + val_size)
+    gss2 = GroupShuffleSplit(n_splits=1, test_size=test_fraction, random_state=42)
+    val_idx_r, test_idx_r = next(gss2.split(temp_df, groups=temp_df["alpha_seq"]))
 
     splits = {
         "train": df.iloc[train_idx]["pdb_id"].tolist(),

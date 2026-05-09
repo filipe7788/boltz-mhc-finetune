@@ -2,6 +2,13 @@
 
 import numpy as np
 from Bio.PDB import PDBParser, Superimposer
+from Bio.PDB.MMCIFParser import MMCIFParser
+
+
+def load_structure(path: str, name: str):
+    if path.endswith(".cif"):
+        return MMCIFParser(QUIET=True).get_structure(name, path)
+    return PDBParser(QUIET=True).get_structure(name, path)
 
 
 def get_ca_atoms(structure, chain_id: str) -> list:
@@ -26,9 +33,8 @@ def peptide_rmsd(pred_pdb: str, ref_pdb: str, alpha_chain: str = "A", peptide_ch
     Align structures by MHC alpha chain, then compute RMSD on peptide only.
     Lower is better; < 1.0 Å is excellent, < 2.0 Å is acceptable.
     """
-    parser = PDBParser(QUIET=True)
-    pred = parser.get_structure("pred", pred_pdb)
-    ref = parser.get_structure("ref", ref_pdb)
+    pred = load_structure(pred_pdb, "pred")
+    ref = load_structure(ref_pdb, "ref")
 
     pred_alpha = get_ca_atoms(pred, alpha_chain)
     ref_alpha = get_ca_atoms(ref, alpha_chain)
@@ -45,24 +51,32 @@ def peptide_rmsd(pred_pdb: str, ref_pdb: str, alpha_chain: str = "A", peptide_ch
     return rmsd(pred_pep[:min_pep], ref_pep[:min_pep])
 
 
-def interface_rmsd(pred_pdb: str, ref_pdb: str, peptide_chain: str = "C", cutoff: float = 8.0) -> float:
-    """RMSD restricted to residues at the MHC-peptide interface (within cutoff Å)."""
-    parser = PDBParser(QUIET=True)
-    ref = parser.get_structure("ref", ref_pdb)
-    pred = parser.get_structure("pred", pred_pdb)
+def interface_rmsd(pred_pdb: str, ref_pdb: str, alpha_chain: str = "A", peptide_chain: str = "C", cutoff: float = 8.0) -> float:
+    """RMSD restricted to residues at the MHC-peptide interface (within cutoff Å).
+    Structures are first aligned by alpha chain, same as peptide_rmsd."""
+    pred = load_structure(pred_pdb, "pred")
+    ref = load_structure(ref_pdb, "ref")
 
-    def interface_residues(structure, chain_a: str, chain_b: str, cutoff: float) -> set:
-        residues = set()
+    # Align by alpha chain first
+    pred_alpha = get_ca_atoms(pred, alpha_chain)
+    ref_alpha = get_ca_atoms(ref, alpha_chain)
+    min_len = min(len(pred_alpha), len(ref_alpha))
+    sup = Superimposer()
+    sup.set_atoms(ref_alpha[:min_len], pred_alpha[:min_len])
+    sup.apply(list(pred[0].get_atoms()))
+
+    def interface_residue_ids(structure, chain_a: str, chain_b: str, cutoff: float) -> set:
+        ids = set()
         for res_a in structure[0][chain_a].get_residues():
             for res_b in structure[0][chain_b].get_residues():
                 for atom_a in res_a.get_atoms():
                     for atom_b in res_b.get_atoms():
                         if atom_a - atom_b < cutoff:
-                            residues.add(res_a.id[1])
-                            residues.add(res_b.id[1])
-        return residues
+                            ids.add(res_b.id[1])
+        return ids
 
-    interface = interface_residues(ref, "A", peptide_chain, cutoff)
+    # Interface defined on the reference peptide residues only
+    interface = interface_residue_ids(ref, alpha_chain, peptide_chain, cutoff)
 
     def get_interface_ca(structure, chain_id):
         return [

@@ -64,7 +64,7 @@ if __name__ == "__main__":
     args = get_args()
     predict(
         hla_sequence=args.hla_sequence,
-        peptide=args.peptide,
+        peptide_sequence=args.peptide,
         checkpoint=args.checkpoint,
         out_dir=args.out_dir,
         use_msa_server=not args.no_msa_server,

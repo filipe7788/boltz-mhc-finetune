@@ -2,8 +2,11 @@
 
 import argparse
 import os
+import sys
 import torch
 from torch.utils.data import DataLoader
+
+sys.path.insert(0, os.path.dirname(__file__))
 from dataset import MHCPeptideDataset
 
 
@@ -20,8 +23,10 @@ def get_args():
 
 
 def load_model(checkpoint: str, partial: bool):
-    # Boltz-1 uses Lightning checkpoints — load via torch
-    model = torch.load(checkpoint, map_location="cpu")
+    # Boltz-1 is a Lightning module — must use load_from_checkpoint, not torch.load,
+    # otherwise you get the raw dict instead of the model object.
+    from boltz.model.models.boltz1 import Boltz1
+    model = Boltz1.load_from_checkpoint(checkpoint, map_location="cpu")
 
     if partial:
         for name, param in model.named_parameters():
@@ -90,7 +95,7 @@ def train(args):
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
-            ckpt_path = os.path.join(args.out_dir, "best_mhc.ckpt")
+            ckpt_path = os.path.join(args.out_dir, "best_mhc.pt")
             torch.save(model.state_dict(), ckpt_path)
             print(f"  Saved best checkpoint → {ckpt_path}")
 

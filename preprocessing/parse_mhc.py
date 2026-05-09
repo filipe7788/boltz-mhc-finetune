@@ -4,7 +4,6 @@ import os
 import pandas as pd
 from tqdm import tqdm
 from Bio.PDB.MMCIFParser import MMCIFParser
-from Bio.PDB.Polypeptide import PPBuilder
 
 THREE_TO_ONE = {
     "ALA": "A", "ARG": "R", "ASN": "N", "ASP": "D", "CYS": "C",
@@ -31,12 +30,15 @@ def extract_sequences(filtered_csv: str, raw_dir: str, out_dir: str):
         if not os.path.exists(cif_path):
             continue
 
-        structure = parser.get_structure(pdb_id, cif_path)
-        model = structure[0]
-
-        alpha_seq = chain_to_sequence(model[row["alpha"]])
-        b2m_seq = chain_to_sequence(model[row["b2m"]])
-        peptide_seq = chain_to_sequence(model[row["peptide"]])
+        try:
+            structure = parser.get_structure(pdb_id, cif_path)
+            model = structure[0]
+            alpha_seq = chain_to_sequence(model[row["alpha"]])
+            b2m_seq = chain_to_sequence(model[row["b2m"]])
+            peptide_seq = chain_to_sequence(model[row["peptide"]])
+        except Exception as e:
+            print(f"  Skipping {pdb_id}: {e}")
+            continue
 
         fasta_path = os.path.join(out_dir, f"{pdb_id}.fasta")
         with open(fasta_path, "w") as f:
