@@ -10,6 +10,9 @@ THREE_TO_ONE = {
     "GLN": "Q", "GLU": "E", "GLY": "G", "HIS": "H", "ILE": "I",
     "LEU": "L", "LYS": "K", "MET": "M", "PHE": "F", "PRO": "P",
     "SER": "S", "THR": "T", "TRP": "W", "TYR": "Y", "VAL": "V",
+    # Common non-standard residues in MHC crystal structures
+    "MSE": "M",  # selenomethionine (phasing aid) → methionine
+    "CSE": "C",  # selenocysteine → cysteine
 }
 
 
