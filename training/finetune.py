@@ -143,9 +143,9 @@ def main():
     callbacks = [
         ModelCheckpoint(
             dirpath=args.out_dir,
-            filename="boltz_mhc_{epoch:02d}_{val_loss:.4f}",
-            monitor="val/loss",
-            mode="min",
+            filename="boltz_mhc_{epoch:02d}_{val_lddt_intra_protein:.4f}",
+            monitor="val/lddt_intra_protein",
+            mode="max",
             save_top_k=3,
         ),
         LearningRateMonitor(logging_interval="step"),

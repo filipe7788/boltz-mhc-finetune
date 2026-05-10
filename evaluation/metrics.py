@@ -78,22 +78,23 @@ def interface_rmsd(pred_pdb: str, ref_pdb: str, alpha_chain: str = "A", peptide_
     # Interface defined on the reference peptide residues only
     interface = interface_residue_ids(ref, alpha_chain, peptide_chain, cutoff)
 
-    def get_interface_ca(structure, chain_id):
-        return [
-            atom
-            for residue in structure[0][chain_id].get_residues()
-            if residue.id[1] in interface and residue.id[0] == " "
-            for atom in residue.get_atoms()
-            if atom.name == "CA"
-        ]
+    def get_interface_ca_by_resid(structure, chain_id) -> dict:
+        ca_map = {}
+        for residue in structure[0][chain_id].get_residues():
+            if residue.id[0] != " " or residue.id[1] not in interface:
+                continue
+            ca = next((a for a in residue.get_atoms() if a.name == "CA"), None)
+            if ca is not None:
+                ca_map[residue.id[1]] = ca
+        return ca_map
 
-    pred_ca = get_interface_ca(pred, peptide_chain)
-    ref_ca = get_interface_ca(ref, peptide_chain)
-    min_len = min(len(pred_ca), len(ref_ca))
-    if min_len == 0:
+    pred_ca_map = get_interface_ca_by_resid(pred, peptide_chain)
+    ref_ca_map  = get_interface_ca_by_resid(ref,  peptide_chain)
+    common_ids  = sorted(pred_ca_map.keys() & ref_ca_map.keys())
+    if not common_ids:
         return float("nan")
 
-    return rmsd(pred_ca[:min_len], ref_ca[:min_len])
+    return rmsd([pred_ca_map[i] for i in common_ids], [ref_ca_map[i] for i in common_ids])
 
 
 def evaluate_dataset(predictions: dict[str, str], references: dict[str, str]) -> list[dict]:

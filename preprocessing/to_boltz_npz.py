@@ -172,7 +172,7 @@ def main():
 
     with open("data/splits.json") as f:
         splits = json.load(f)
-    val_ids = set(splits["val"] + splits["test"])
+    val_ids = set(splits["val"])
 
     manifest_data = {"records": [r.to_dict() for r in records]}
 

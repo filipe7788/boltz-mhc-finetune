@@ -15,10 +15,10 @@ def make_input_yaml(hla_sequence: str, peptide_sequence: str, out_path: str):
                 "protein": {
                     "id": "B",
                     # beta-2 microglobulin (canonical human sequence)
-                    # Mature B2M sequence (signal peptide cleaved, 96 aa)
+                    # Mature B2M (UniProt P61769, signal peptide cleaved, 99 aa)
                     "sequence": (
                         "IQRTPKIQVYSRHPAENGKSNFLNCYVSGFHPSDIEVDLLKNGER"
-                        "VEHSDLSFSKDWSFYLLYYTEFTPTEKDEYACRVNHVTLSQPKIVKWDRDM"
+                        "IEKVEHSDLSFSKDWSFYLLYYTEFTPTEKDEYACRVNHVTLSQPKIVKWDRDM"
                     ),
                 }
             },
