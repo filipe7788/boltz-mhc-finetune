@@ -69,7 +69,7 @@ def convert_cif_to_npz(cif_path: str, out_dir: str, ccd: dict) -> bool:
         # StructureV2 has no connections field; synthesise an empty v1 connections array
         empty_connections = np.array([], dtype=np.dtype(Connection))
 
-        np.savez(
+        np.savez_compressed(
             out_path,
             atoms=atoms_v1,
             bonds=bonds_v1,

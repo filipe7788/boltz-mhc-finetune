@@ -38,11 +38,15 @@ def classify_chains(structure) -> dict | None:
 
 def has_missing_residues(chain, structure, model_id=0) -> bool:
     residues = [r for r in structure[model_id][chain].get_residues() if r.id[0] == " "]
-    seq_nums = [r.id[1] for r in residues]
-    if not seq_nums:
+    # Use full residue id (seq_num, icode) to handle insertion codes correctly;
+    # plain integer comparison would treat 100A and 100B as the same residue.
+    ids = [r.id[1:] for r in residues]  # (seq_num, icode) tuples
+    if not ids:
         return True
-    expected = set(range(min(seq_nums), max(seq_nums) + 1))
-    return len(expected - set(seq_nums)) > 0
+    seq_nums = [i[0] for i in ids]
+    expected_count = max(seq_nums) - min(seq_nums) + 1
+    unique_ids = len(set(ids))
+    return unique_ids < expected_count
 
 
 def filter_structures(raw_dir: str, out_path: str):

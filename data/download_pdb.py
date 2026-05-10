@@ -51,7 +51,12 @@ def query_mhc_structures() -> list[str]:
 
     response = requests.post(PDB_SEARCH_URL, json=query, timeout=60)
     response.raise_for_status()
-    results = response.json().get("result_set", [])
+    data = response.json()
+    total = data.get("total_count", 0)
+    results = data.get("result_set", [])
+    if total > len(results):
+        print(f"WARNING: query matched {total} entries but only {len(results)} returned. "
+              "Increase rows in paginate or implement pagination to avoid missing entries.")
     return [r["identifier"] for r in results]
 
 
