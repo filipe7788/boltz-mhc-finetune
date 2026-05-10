@@ -97,17 +97,32 @@ def interface_rmsd(pred_pdb: str, ref_pdb: str, alpha_chain: str = "A", peptide_
     return rmsd([pred_ca_map[i] for i in common_ids], [ref_ca_map[i] for i in common_ids])
 
 
-def evaluate_dataset(predictions: dict[str, str], references: dict[str, str]) -> list[dict]:
+def evaluate_dataset(
+    predictions: dict[str, str],
+    references: dict[str, str],
+    alpha_chain: str = "A",
+    peptide_chain: str = "C",
+) -> list[dict]:
     """
-    predictions: {pdb_id: path_to_predicted_pdb}
-    references:  {pdb_id: path_to_reference_pdb}
+    predictions: {pdb_id: path_to_predicted_structure}
+    references:  {pdb_id: path_to_reference_structure}
     """
     results = []
     for pdb_id in predictions:
         if pdb_id not in references:
             continue
-        p_rmsd = peptide_rmsd(predictions[pdb_id], references[pdb_id])
-        i_rmsd = interface_rmsd(predictions[pdb_id], references[pdb_id])
+        try:
+            p_rmsd = peptide_rmsd(
+                predictions[pdb_id], references[pdb_id],
+                alpha_chain=alpha_chain, peptide_chain=peptide_chain,
+            )
+            i_rmsd = interface_rmsd(
+                predictions[pdb_id], references[pdb_id],
+                alpha_chain=alpha_chain, peptide_chain=peptide_chain,
+            )
+        except Exception as e:
+            print(f"  WARNING: metrics failed for {pdb_id}: {e}")
+            p_rmsd = i_rmsd = float("nan")
         results.append({"pdb_id": pdb_id, "peptide_rmsd": p_rmsd, "interface_rmsd": i_rmsd})
 
     return results

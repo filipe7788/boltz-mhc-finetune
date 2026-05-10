@@ -28,6 +28,8 @@ def get_args():
                         help="Freeze Evoformer (msa_module + pairformer_module), train structure module only")
     parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--resume", type=str, default=None,
+                        help="Resume training from a Lightning checkpoint (.ckpt)")
     return parser.parse_args()
 
 
@@ -163,7 +165,7 @@ def main():
         default_root_dir=args.out_dir,
     )
 
-    trainer.fit(model, datamodule=data_module)
+    trainer.fit(model, datamodule=data_module, ckpt_path=args.resume)
 
 
 if __name__ == "__main__":
