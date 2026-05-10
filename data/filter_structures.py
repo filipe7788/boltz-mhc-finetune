@@ -67,7 +67,8 @@ def filter_structures(raw_dir: str, out_path: str):
             if chains is None:
                 skipped += 1
                 continue
-            if has_missing_residues(chains["peptide"], structure):
+            if has_missing_residues(chains["peptide"], structure) or \
+               has_missing_residues(chains["alpha"], structure):
                 skipped += 1
                 continue
             records.append({"pdb_id": pdb_id, **chains})

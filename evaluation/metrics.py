@@ -72,7 +72,7 @@ def interface_rmsd(pred_pdb: str, ref_pdb: str, alpha_chain: str = "A", peptide_
                 for atom_a in res_a.get_atoms():
                     for atom_b in res_b.get_atoms():
                         if atom_a - atom_b < cutoff:
-                            ids.add(res_b.id[1])
+                            ids.add(res_b.id[1:])  # (seq_num, icode) tuple
         return ids
 
     # Interface defined on the reference peptide residues only
@@ -81,11 +81,11 @@ def interface_rmsd(pred_pdb: str, ref_pdb: str, alpha_chain: str = "A", peptide_
     def get_interface_ca_by_resid(structure, chain_id) -> dict:
         ca_map = {}
         for residue in structure[0][chain_id].get_residues():
-            if residue.id[0] != " " or residue.id[1] not in interface:
+            if residue.id[0] != " " or residue.id[1:] not in interface:
                 continue
             ca = next((a for a in residue.get_atoms() if a.name == "CA"), None)
             if ca is not None:
-                ca_map[residue.id[1]] = ca
+                ca_map[residue.id[1:]] = ca  # key on (seq_num, icode) tuple
         return ca_map
 
     pred_ca_map = get_interface_ca_by_resid(pred, peptide_chain)
