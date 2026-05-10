@@ -2,8 +2,8 @@
 
 import json
 import os
+import pickle
 import sys
-import traceback
 from pathlib import Path
 
 import numpy as np
@@ -11,10 +11,10 @@ import pandas as pd
 from tqdm import tqdm
 
 
-def convert_cif_to_npz(cif_path: str, out_dir: str, ccd_path: str) -> bool:
-    """Parse a mmCIF file using Boltz's internal parser and save as npz."""
+def convert_cif_to_npz(cif_path: str, out_dir: str, ccd: dict) -> bool:
+    """Parse a mmCIF file using Boltz's internal parser and save as v1 npz."""
     from boltz.data.parse.mmcif import parse_mmcif
-    from boltz.data.mol import load_molecules
+    from boltz.data.types import Connection
 
     pdb_id = Path(cif_path).stem
     out_path = Path(out_dir) / "structures" / f"{pdb_id}.npz"
@@ -22,38 +22,36 @@ def convert_cif_to_npz(cif_path: str, out_dir: str, ccd_path: str) -> bool:
         return True
 
     try:
-        with open(ccd_path, "rb") as f:
-            import pickle
-            ccd = pickle.load(f)
-
-        molecules = load_molecules(ccd)
-        result = parse_mmcif(
-            path=cif_path,
-            molecules=molecules,
-            symmetries=None,
-        )
+        # parse_mmcif returns ParsedStructure(data: StructureV2, info, sequences)
+        result = parse_mmcif(path=cif_path, mols=ccd)
         if result is None:
             return False
 
-        structure = result.structure
+        s = result.data  # StructureV2
+
+        # StructureV2 has no `connections` field; training.load_input expects the
+        # v1 Structure format which does. Synthesise an empty connections array so
+        # the npz is compatible with BoltzTrainingDataModule.
+        empty_connections = np.array([], dtype=np.dtype(Connection))
+
         np.savez(
             out_path,
-            atoms=structure.atoms,
-            bonds=structure.bonds,
-            residues=structure.residues,
-            chains=structure.chains,
-            connections=structure.connections,
-            interfaces=structure.interfaces,
-            mask=structure.mask,
+            atoms=s.atoms,
+            bonds=s.bonds,
+            residues=s.residues,
+            chains=s.chains,
+            connections=empty_connections,
+            interfaces=s.interfaces,
+            mask=s.mask,
         )
         return True
     except Exception:
         return False
 
 
-def build_manifest(filtered_csv: str, structures_dir: str) -> list[dict]:
+def build_manifest(filtered_csv: str, structures_dir: str) -> list:
     """Build manifest records for structures that were successfully converted."""
-    from boltz.data.types import Record, ChainInfo, Manifest
+    from boltz.data.types import ChainInfo, Record, StructureInfo
 
     df = pd.read_csv(filtered_csv)
     records = []
@@ -68,19 +66,26 @@ def build_manifest(filtered_csv: str, structures_dir: str) -> list[dict]:
             data = np.load(npz_path, allow_pickle=True)
             chains = data["chains"]
             chain_infos = []
-            for chain in chains:
+            for i, chain in enumerate(chains):
                 chain_infos.append(
                     ChainInfo(
-                        chain_id=str(chain["chain_id"]),
-                        chain_type=int(chain["chain_type"]),
-                        entity_id=str(chain["entity_id"]),
-                        msa_id=-1,  # no MSA for any chain in pMHC training
-                        num_residues=int(chain["num_residues"]),
+                        chain_id=int(chain["asym_id"]),
+                        chain_name=str(chain["name"]).strip(),
+                        mol_type=int(chain["mol_type"]),
+                        cluster_id=-1,
+                        msa_id=-1,
+                        num_residues=int(chain["res_num"]),
+                        entity_id=int(chain["entity_id"]),
                         valid=True,
                     )
                 )
             records.append(
-                Record(id=pdb_id, chains=chain_infos, interfaces=[])
+                Record(
+                    id=pdb_id,
+                    structure=StructureInfo(),
+                    chains=chain_infos,
+                    interfaces=[],
+                )
             )
         except Exception:
             continue
@@ -88,14 +93,17 @@ def build_manifest(filtered_csv: str, structures_dir: str) -> list[dict]:
     return records
 
 
-def get_ccd_path() -> str:
-    """Find the CCD file downloaded by Boltz."""
-    cache = Path.home() / ".boltz"
-    ccd_path = cache / "ccd.pkl"
+def get_ccd(ccd_path: str | None = None) -> dict:
+    """Load the CCD dict from disk."""
+    if ccd_path is None:
+        ccd_path = Path.home() / ".boltz" / "ccd.pkl"
+    else:
+        ccd_path = Path(ccd_path)
     if not ccd_path.exists():
         print("CCD file not found. Run 'boltz predict' once to download it.")
         sys.exit(1)
-    return str(ccd_path)
+    with open(ccd_path, "rb") as f:
+        return pickle.load(f)
 
 
 def main():
@@ -107,7 +115,7 @@ def main():
     os.makedirs(f"{out_dir}/structures", exist_ok=True)
     os.makedirs(msa_dir, exist_ok=True)
 
-    ccd_path = get_ccd_path()
+    ccd = get_ccd()
     df = pd.read_csv(filtered_csv)
 
     print(f"Converting {len(df)} CIF files to Boltz npz format...")
@@ -118,7 +126,7 @@ def main():
         if not os.path.exists(cif_path):
             failed += 1
             continue
-        ok = convert_cif_to_npz(cif_path, out_dir, ccd_path)
+        ok = convert_cif_to_npz(cif_path, out_dir, ccd)
         if not ok:
             failed += 1
 
@@ -127,33 +135,15 @@ def main():
     print("Building manifest...")
     records = build_manifest(filtered_csv, f"{out_dir}/structures")
 
-    # Load split to annotate val records
     with open("data/splits.json") as f:
         splits = json.load(f)
     val_ids = set(splits["val"] + splits["test"])
 
-    manifest_data = {"records": []}
-    for r in records:
-        manifest_data["records"].append({
-            "id": r.id,
-            "chains": [
-                {
-                    "chain_id": c.chain_id,
-                    "chain_type": c.chain_type,
-                    "entity_id": c.entity_id,
-                    "msa_id": c.msa_id,
-                    "num_residues": c.num_residues,
-                    "valid": c.valid,
-                }
-                for c in r.chains
-            ],
-            "interfaces": [],
-        })
+    manifest_data = {"records": [r.to_dict() for r in records]}
 
     with open(f"{out_dir}/manifest.json", "w") as f:
         json.dump(manifest_data, f, indent=2)
 
-    # Write val split file (list of IDs that are validation)
     val_in_manifest = [r.id for r in records if r.id in val_ids]
     with open(f"{out_dir}/val_split.txt", "w") as f:
         f.write("\n".join(val_in_manifest))

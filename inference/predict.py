@@ -15,8 +15,9 @@ def make_input_yaml(hla_sequence: str, peptide_sequence: str, out_path: str):
                 "protein": {
                     "id": "B",
                     # beta-2 microglobulin (canonical human sequence)
+                    # Mature B2M sequence (signal peptide cleaved, 96 aa)
                     "sequence": (
-                        "MSRSVALAVLALLSLSGLEAIQRTPKIQVYSRHPAENGKSNFLNCYVSGFHPSDIEVDLLKNGER"
+                        "IQRTPKIQVYSRHPAENGKSNFLNCYVSGFHPSDIEVDLLKNGER"
                         "VEHSDLSFSKDWSFYLLYYTEFTPTEKDEYACRVNHVTLSQPKIVKWDRDM"
                     ),
                 }
@@ -39,7 +40,7 @@ def predict(
     yaml_path = os.path.join(out_dir, "input.yaml")
     make_input_yaml(hla_sequence, peptide_sequence, yaml_path)
 
-    cmd = ["boltz", "predict", yaml_path, "--output_dir", out_dir]
+    cmd = ["boltz", "predict", yaml_path, "--out_dir", out_dir]
     if checkpoint:
         cmd += ["--checkpoint", checkpoint]
     if use_msa_server:
