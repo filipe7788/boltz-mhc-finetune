@@ -11,8 +11,41 @@ import pandas as pd
 from tqdm import tqdm
 
 
+def _encode_atom_name(name: str) -> tuple:
+    """Encode a 4-char atom name string to the 4xi1 int format Boltz uses."""
+    name = name.strip()
+    ints = [ord(c) - 32 for c in name]
+    ints += [0] * (4 - len(ints))
+    return tuple(ints[:4])
+
+
+def _atoms_v2_to_v1(atoms_v2: np.ndarray) -> np.ndarray:
+    """Convert AtomV2 structured array to v1 Atom dtype expected by the featurizer."""
+    from boltz.data.types import Atom
+
+    out = np.zeros(len(atoms_v2), dtype=np.dtype(Atom))
+    for i, a in enumerate(atoms_v2):
+        out[i]["name"] = _encode_atom_name(str(a["name"]))
+        out[i]["coords"] = a["coords"]
+        out[i]["conformer"] = a["coords"]   # best available; no separate conformer in v2
+        out[i]["is_present"] = a["is_present"]
+        # element / charge / chirality not in AtomV2; leave as 0 (unknown)
+    return out
+
+
+def _bonds_v2_to_v1(bonds_v2: np.ndarray) -> np.ndarray:
+    """Convert BondV2 structured array to v1 Bond dtype (atom_1, atom_2, type)."""
+    from boltz.data.types import Bond
+
+    out = np.zeros(len(bonds_v2), dtype=np.dtype(Bond))
+    out["atom_1"] = bonds_v2["atom_1"]
+    out["atom_2"] = bonds_v2["atom_2"]
+    out["type"] = bonds_v2["type"]
+    return out
+
+
 def convert_cif_to_npz(cif_path: str, out_dir: str, ccd: dict) -> bool:
-    """Parse a mmCIF file using Boltz's internal parser and save as v1 npz."""
+    """Parse a mmCIF file using Boltz's parser and save as v1-compatible npz."""
     from boltz.data.parse.mmcif import parse_mmcif
     from boltz.data.types import Connection
 
@@ -29,15 +62,17 @@ def convert_cif_to_npz(cif_path: str, out_dir: str, ccd: dict) -> bool:
 
         s = result.data  # StructureV2
 
-        # StructureV2 has no `connections` field; training.load_input expects the
-        # v1 Structure format which does. Synthesise an empty connections array so
-        # the npz is compatible with BoltzTrainingDataModule.
+        # Convert v2 atom/bond arrays to v1 format required by BoltzTrainingDataModule
+        atoms_v1 = _atoms_v2_to_v1(s.atoms)
+        bonds_v1 = _bonds_v2_to_v1(s.bonds)
+
+        # StructureV2 has no connections field; synthesise an empty v1 connections array
         empty_connections = np.array([], dtype=np.dtype(Connection))
 
         np.savez(
             out_path,
-            atoms=s.atoms,
-            bonds=s.bonds,
+            atoms=atoms_v1,
+            bonds=bonds_v1,
             residues=s.residues,
             chains=s.chains,
             connections=empty_connections,
@@ -66,7 +101,7 @@ def build_manifest(filtered_csv: str, structures_dir: str) -> list:
             data = np.load(npz_path, allow_pickle=True)
             chains = data["chains"]
             chain_infos = []
-            for i, chain in enumerate(chains):
+            for chain in chains:
                 chain_infos.append(
                     ChainInfo(
                         chain_id=int(chain["asym_id"]),

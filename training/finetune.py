@@ -56,7 +56,7 @@ def load_model(checkpoint: str, partial: bool) -> "Boltz1":
         for name, param in model.named_parameters():
             param.requires_grad = False
         for name, param in model.named_parameters():
-            if any(k in name for k in ("structure_module", "diffusion_module")):
+            if "structure_module" in name:
                 param.requires_grad = True
         trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
         total = sum(p.numel() for p in model.parameters())
